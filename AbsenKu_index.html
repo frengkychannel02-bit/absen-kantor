@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AbsenKu — Sistem Absensi Digital</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #1a7a4a;
+      --green-light: #e6f7ed;
+      --green-mid: #2db36f;
+      --red: #c0392b;
+      --red-light: #fdecea;
+      --orange: #e67e22;
+      --orange-light: #fef3e2;
+      --bg: #f0f4f0;
+      --card: #ffffff;
+      --text: #1a2e1a;
+      --text-muted: #5a6e5a;
+      --border: #d0ddd0;
+      --shadow: 0 4px 24px rgba(26,122,74,0.10);
+      --radius: 16px;
+      --font: 'Sora', sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--green);
+      color: white;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.5px; }
+    .logo span { opacity: 0.7; font-weight: 300; }
+    #live-clock {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      background: rgba(255,255,255,0.15);
+      padding: 0.3rem 0.8rem;
+      border-radius: 8px;
+      letter-spacing: 1px;
+    }
+
+    /* ── MAIN LAYOUT ── */
+    main {
+      flex: 1;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+      width: 100%;
+    }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    /* ── STATUS WINDOW ── */
+    #status-window {
+      background: linear-gradient(135deg, #1a7a4a 0%, #0f5733 100%);
+      color: white;
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    #status-window::before {
+      content: '';
+      position: absolute;
+      top: -30px; right: -30px;
+      width: 100px; height: 100px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 50%;
+    }
+    #status-window::after {
+      content: '';
+      position: absolute;
+      bottom: -40px; left: -20px;
+      width: 130px; height: 130px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 50%;
+    }
+    .status-emoji { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .status-title { font-size: 0.7rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; opacity: 0.7; }
+    .status-message { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; line-height: 1.4; }
+    .status-sub { font-size: 0.8rem; opacity: 0.8; margin-top: 0.25rem; }
+
+    /* ── TIME WINDOW ── */
+    #window-info {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 1.25rem;
+    }
+    .window-pill {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.75rem;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .window-pill .wp-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+    .window-pill .wp-time { font-family: var(--mono); font-size: 1rem; font-weight: 600; color: var(--green); margin-top: 2px; }
+    .window-pill.active { background: var(--green-light); border-color: var(--green-mid); }
+    .window-pill.active .wp-time { color: var(--green); }
+
+    /* ── CAMERA ── */
+    #cam-container {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #1a2e1a;
+      aspect-ratio: 4/3;
+      margin-bottom: 1rem;
+    }
+    #cam-container video,
+    #cam-container canvas {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    #canvas-preview { display: none; }
+    .cam-overlay {
+      position: absolute;
+      inset: 0;
+      border: 3px solid rgba(45,179,111,0.6);
+      border-radius: 12px;
+      pointer-events: none;
+    }
+    .cam-corner {
+      position: absolute;
+      width: 20px; height: 20px;
+      border-color: var(--green-mid);
+      border-style: solid;
+    }
+    .cam-corner.tl { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+    .cam-corner.tr { top: 8px; right: 8px; border-width: 2px 2px 0 0; }
+    .cam-corner.bl { bottom: 8px; left: 8px; border-width: 0 0 2px 2px; }
+    .cam-corner.br { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+    .cam-label {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.55);
+      color: rgba(255,255,255,0.9);
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    #snapshot-preview {
+      display: none;
+      width: 100%;
+      border-radius: 12px;
+      border: 2px solid var(--green-mid);
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── LOKASI ── */
+    #lokasi-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      font-weight: 500;
+      transition: all 0.3s;
+    }
+    #lokasi-status.unknown { background: #f5f5f5; color: var(--text-muted); }
+    #lokasi-status.checking { background: var(--orange-light); color: var(--orange); }
+    #lokasi-status.valid { background: var(--green-light); color: var(--green); }
+    #lokasi-status.invalid { background: var(--red-light); color: var(--red); }
+    .loc-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: currentColor;
+    }
+    .loc-dot.pulse { animation: pulse 1.2s infinite; }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+
+    /* ── TOMBOL ── */
+    .btn {
+      width: 100%;
+      padding: 0.9rem;
+      border: none;
+      border-radius: 12px;
+      font-family: var(--font);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 0.6rem;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--green); color: white; }
+    .btn-primary:hover { background: #15603b; }
+    .btn-primary:disabled { background: #a0bfa8; cursor: not-allowed; transform: none; }
+    .btn-danger { background: var(--red); color: white; }
+    .btn-danger:hover { background: #a93226; }
+    .btn-danger:disabled { background: #e0a0a0; cursor: not-allowed; transform: none; }
+    .btn-outline { background: white; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { background: #f5f5f5; }
+
+    /* ── RIWAYAT ── */
+    #history-list { list-style: none; }
+    #history-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    #history-list li:last-child { border-bottom: none; }
+    .hist-icon {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .hist-icon.masuk { background: var(--green-light); }
+    .hist-icon.keluar { background: var(--red-light); }
+    .hist-info { flex: 1; }
+    .hist-name { font-weight: 600; }
+    .hist-time { color: var(--text-muted); font-family: var(--mono); font-size: 0.8rem; }
+    .hist-badge {
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .hist-badge.tepat { background: var(--green-light); color: var(--green); }
+    .hist-badge.telat { background: var(--red-light); color: var(--red); }
+    .hist-badge.keluar { background: #e8f4fd; color: #1a6fa8; }
+    .empty-history {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 2rem;
+      font-size: 0.85rem;
+    }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: white;
+      border-radius: var(--radius);
+      padding: 2rem;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    .modal-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+    .modal-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .modal-sub { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .modal-time {
+      font-family: var(--mono);
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--green);
+      background: var(--green-light);
+      padding: 0.5rem 1.5rem;
+      border-radius: 10px;
+      display: inline-block;
+      margin-bottom: 1rem;
+    }
+    #modal-foto { width: 100%; border-radius: 10px; margin-bottom: 1rem; display: none; }
+
+    /* ── NAMA FORM ── */
+    #nama-form {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    #nama-form input {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.95rem;
+      margin-top: 0.5rem;
+      margin-bottom: 0.75rem;
+      outline: none;
+      transition: border 0.2s;
+    }
+    #nama-form input:focus { border-color: var(--green-mid); }
+    #nama-form label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+
+    /* ── ADMIN SETTINGS ── */
+    #admin-panel {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+    #admin-panel.show { display: block; }
+    #admin-panel label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); display: block; margin-bottom: 4px; margin-top: 12px; }
+    #admin-panel label:first-of-type { margin-top: 0; }
+    #admin-panel input {
+      width: 100%;
+      padding: 0.65rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      outline: none;
+    }
+    #admin-panel input:focus { border-color: var(--green-mid); }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1a2e1a;
+      color: white;
+      padding: 0.7rem 1.4rem;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 9999;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Absen<span>Ku</span></div>
+  <div id="live-clock">--:--:--</div>
+</header>
+
+<main>
+
+  <!-- STATUS WINDOW -->
+  <div id="status-window">
+    <div class="status-emoji" id="status-emoji">🕐</div>
+    <div class="status-title">Status Absensi</div>
+    <div class="status-message" id="status-msg">Memuat...</div>
+    <div class="status-sub" id="status-sub"></div>
+  </div>
+
+  <!-- TIME WINDOWS -->
+  <div id="window-info">
+    <div class="window-pill" id="pill-masuk">
+      <div class="wp-label">Absen Masuk</div>
+      <div class="wp-time" id="wp-masuk">08:45 – 09:10</div>
+    </div>
+    <div class="window-pill" id="pill-target">
+      <div class="wp-label">Jam Kantor</div>
+      <div class="wp-time">09:00</div>
+    </div>
+    <div class="window-pill" id="pill-keluar">
+      <div class="wp-label">Absen Keluar</div>
+      <div class="wp-time" id="wp-keluar">16:00+</div>
+    </div>
+  </div>
+
+  <!-- NAMA -->
+  <div id="nama-form">
+    <label>Nama Karyawan</label>
+    <input type="text" id="input-nama" placeholder="Masukkan nama lengkap..." />
+    <button class="btn btn-outline" onclick="toggleAdmin()">⚙️ Pengaturan Admin</button>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="admin-panel">
+    <div class="card-title">⚙️ Pengaturan Lokasi Kantor</div>
+    <label>Latitude Kantor</label>
+    <input type="number" id="set-lat" step="0.0001" placeholder="-6.2088" />
+    <label>Longitude Kantor</label>
+    <input type="number" id="set-lng" step="0.0001" placeholder="106.8456" />
+    <label>Radius Absen (meter)</label>
+    <input type="number" id="set-radius" placeholder="100" min="10" max="1000" />
+    <label>Jam Masuk (default 09:00)</label>
+    <input type="time" id="set-jam" value="09:00" />
+    <button class="btn btn-primary" style="margin-top:1rem;" onclick="simpanSetting()">💾 Simpan Pengaturan</button>
+  </div>
+
+  <!-- KAMERA -->
+  <div class="card">
+    <div class="card-title">📷 Foto Selfie</div>
+    <div id="cam-container">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas-preview"></canvas>
+      <div class="cam-overlay">
+        <div class="cam-corner tl"></div>
+        <div class="cam-corner tr"></div>
+        <div class="cam-corner bl"></div>
+        <div class="cam-corner br"></div>
+      </div>
+      <div class="cam-label" id="cam-label">Kamera aktif — posisikan wajah Anda</div>
+    </div>
+    <img id="snapshot-preview" alt="Foto selfie" />
+    <button class="btn btn-outline" onclick="ambilFoto()" id="btn-foto">📸 Ambil Foto</button>
+  </div>
+
+  <!-- LOKASI -->
+  <div id="lokasi-status" class="unknown">
+    <div class="loc-dot"></div>
+    <span id="lokasi-text">Tekan cek lokasi untuk memverifikasi</span>
+  </div>
+  <button class="btn btn-outline" onclick="cekLokasi()" id="btn-lokasi">📍 Cek Lokasi</button>
+
+  <!-- TOMBOL ABSEN -->
+  <button class="btn btn-primary" onclick="absen('masuk')" id="btn-masuk" disabled>✅ Absen Masuk</button>
+  <button class="btn btn-danger" onclick="absen('keluar')" id="btn-keluar" disabled>🚪 Absen Keluar</button>
+
+  <!-- RIWAYAT -->
+  <div class="card" style="margin-top:0.5rem;">
+    <div class="card-title">📋 Riwayat Absensi Hari Ini</div>
+    <ul id="history-list">
+      <li class="empty-history">Belum ada absensi hari ini</li>
+    </ul>
+    <button class="btn btn-outline" onclick="exportCSV()" style="margin-top:0.75rem; font-size:0.8rem; padding:0.6rem;">
+      📥 Export CSV
+    </button>
+  </div>
+
+</main>
+
+<!-- MODAL SUKSES -->
+<div class="modal-overlay" id="modal-sukses">
+  <div class="modal-box">
+    <div class="modal-icon" id="modal-icon">✅</div>
+    <div class="modal-title" id="modal-title">Absen Berhasil!</div>
+    <div class="modal-sub" id="modal-sub">Absensi Anda telah tercatat</div>
+    <div class="modal-time" id="modal-time">--:--:--</div>
+    <img id="modal-foto" alt="Foto absen" />
+    <button class="btn btn-primary" onclick="tutupModal()">Tutup</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<footer>AbsenKu v1.0 — Sistem Absensi Digital dengan Geolokasi & Kamera</footer>
+
+<script>
+  // ── CONFIG (bisa diubah di admin panel) ──
+  let CONFIG = {
+    lat: -6.18344,     // ← GANTI dengan lat kantor
+    lng: 106.60564,    // ← GANTI dengan lng kantor
+    radius: 200,      // meter
+    jamMasuk: '09:00',
+    toleransiSebelum: 15,  // menit sebelum jam masuk
+    toleransiSetelah: 10,  // menit setelah jam masuk
+  };
+
+  // Load config dari localStorage
+  const savedConfig = localStorage.getItem('absenku_config');
+  if (savedConfig) CONFIG = { ...CONFIG, ...JSON.parse(savedConfig) };
+
+  let fotoDataUrl = null;
+  let lokasiValid = false;
+  let lokasiKoord = null;
+  let stream = null;
+
+  // ── CLOCK ──
+  function updateClock() {
+    const now = new Date();
+    const t = now.toLocaleTimeString('id-ID', { hour12: false });
+    document.getElementById('live-clock').textContent = t;
+    updateStatusWindow(now);
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── STATUS WINDOW ──
+  function parseJamMasuk() {
+    const [h, m] = CONFIG.jamMasuk.split(':').map(Number);
+    return { h, m };
+  }
+
+  function getWindow() {
+    const { h, m } = parseJamMasuk();
+    const baseMin = h * 60 + m;
+    return {
+      mulai: baseMin - CONFIG.toleransiSebelum,
+      batas: baseMin + CONFIG.toleransiSetelah,
+      target: baseMin
+    };
+  }
+
+  function formatMenit(totalMenit) {
+    const hh = Math.floor(totalMenit / 60);
+    const mm = totalMenit % 60;
+    return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+  }
+
+  function updateStatusWindow(now) {
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const win = getWindow();
+    const emoji = document.getElementById('status-emoji');
+    const msg = document.getElementById('status-msg');
+    const sub = document.getElementById('status-sub');
+
+    // Update pill labels
+    document.getElementById('wp-masuk').textContent =
+      `${formatMenit(win.mulai)} – ${formatMenit(win.batas)}`;
+
+    const sudahMasuk = getAbsenHariIni('masuk');
+    const sudahKeluar = getAbsenHariIni('keluar');
+
+    if (sudahMasuk && sudahKeluar) {
+      emoji.textContent = '🏠'; msg.textContent = 'Anda sudah absen keluar';
+      sub.textContent = `Sampai jumpa besok!`;
+    } else if (sudahMasuk) {
+      emoji.textContent = '💼'; msg.textContent = 'Sedang bekerja';
+      sub.textContent = `Absen masuk: ${sudahMasuk.waktu}`;
+      document.getElementById('btn-keluar').disabled = false;
+    } else if (nowMin < win.mulai) {
+      const sisa = win.mulai - nowMin;
+      emoji.textContent = '⏳'; msg.textContent = `Absensi dibuka ${sisa} menit lagi`;
+      sub.textContent = `Dibuka pukul ${formatMenit(win.mulai)}`;
+    } else if (nowMin >= win.mulai && nowMin <= win.batas) {
+      const isLate = nowMin > win.target;
+      emoji.textContent = isLate ? '⚠️' : '✅';
+      msg.textContent = isLate
+        ? `Masih bisa absen (${win.batas - nowMin} menit tersisa)`
+        : 'Waktu absen masuk AKTIF';
+      sub.textContent = isLate
+        ? `Sudah melewati jam ${CONFIG.jamMasuk}`
+        : `Tepat waktu — jam ${CONFIG.jamMasuk}`;
+      document.getElementById('pill-masuk').classList.add('active');
+    } else {
+      emoji.textContent = '❌'; msg.textContent = 'Waktu absen masuk sudah habis';
+      sub.textContent = `Batas waktu: ${formatMenit(win.batas)}`;
+    }
+  }
+
+  // ── KAMERA ──
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: 640, height: 480 },
+        audio: false
+      });
+      document.getElementById('video').srcObject = stream;
+    } catch (e) {
+      toast('⚠️ Kamera tidak bisa diakses: ' + e.message);
+    }
+  }
+
+  function ambilFoto() {
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas-preview');
+    const preview = document.getElementById('snapshot-preview');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+
+    // Mirror (selfie)
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    // Timestamp watermark
+    const now = new Date();
+    const stamp = now.toLocaleString('id-ID');
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
+    ctx.fillStyle = 'white';
+    ctx.font = '13px JetBrains Mono, monospace';
+    ctx.fillText(`AbsenKu | ${stamp}`, 10, canvas.height - 10);
+
+    fotoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    preview.src = fotoDataUrl;
+    preview.style.display = 'block';
+    document.getElementById('btn-foto').textContent = '🔄 Ambil Ulang';
+    toast('📸 Foto berhasil diambil!');
+    cekTombolAbsen();
+  }
+
+  // ── LOKASI ──
+  function hitungJarak(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function cekLokasi() {
+    const el = document.getElementById('lokasi-status');
+    const txt = document.getElementById('lokasi-text');
+    el.className = 'checking';
+    txt.textContent = 'Mendapatkan lokasi GPS...';
+    el.querySelector('.loc-dot').classList.add('pulse');
+
+    if (!navigator.geolocation) {
+      el.className = 'invalid';
+      txt.textContent = 'Browser tidak mendukung GPS';
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(pos => {
+      lokasiKoord = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const jarak = hitungJarak(lokasiKoord.lat, lokasiKoord.lng, CONFIG.lat, CONFIG.lng);
+      const jarakBulat = Math.round(jarak);
+      el.querySelector('.loc-dot').classList.remove('pulse');
+
+      if (jarak <= CONFIG.radius) {
+        lokasiValid = true;
+        el.className = 'valid';
+        txt.textContent = `✅ Dalam area kantor (${jarakBulat}m dari titik kantor)`;
+      } else {
+        lokasiValid = false;
+        el.className = 'invalid';
+        txt.textContent = `❌ Di luar area kantor — ${jarakBulat}m (batas: ${CONFIG.radius}m)`;
+      }
+      cekTombolAbsen();
+    }, err => {
+      el.querySelector('.loc-dot').classList.remove('pulse');
+      el.className = 'invalid';
+      txt.textContent = 'Gagal mendapatkan GPS: ' + err.message;
+      lokasiValid = false;
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  }
+
+  // ── CEK TOMBOL ABSEN ──
+  function cekTombolAbsen() {
+    const sudahMasuk = getAbsenHariIni('masuk');
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const win = getWindow();
+    const inWindow = nowMin >= win.mulai && nowMin <= win.batas;
+
+    const btnMasuk = document.getElementById('btn-masuk');
+    const btnKeluar = document.getElementById('btn-keluar');
+
+    const bisaMasuk = fotoDataUrl && lokasiValid && inWindow && !sudahMasuk;
+    const bisaKeluar = fotoDataUrl && lokasiValid && sudahMasuk && !getAbsenHariIni('keluar');
+
+    btnMasuk.disabled = !bisaMasuk;
+    btnKeluar.disabled = !bisaKeluar;
+  }
+
+  // ── ABSEN ──
+  function absen(tipe) {
+    const nama = document.getElementById('input-nama').value.trim();
+    if (!nama) { toast('⚠️ Masukkan nama Anda terlebih dahulu!'); return; }
+    if (!fotoDataUrl) { toast('📸 Ambil foto selfie dulu!'); return; }
+    if (!lokasiValid) { toast('📍 Lokasi Anda di luar area kantor!'); return; }
+
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const win = getWindow();
+
+    if (tipe === 'masuk') {
+      const inWindow = nowMin >= win.mulai && nowMin <= win.batas;
+      if (!inWindow) { toast('⏰ Di luar waktu absen masuk!'); return; }
+    }
+
+    const record = {
+      id: Date.now(),
+      nama,
+      tipe,
+      waktu: now.toLocaleTimeString('id-ID', { hour12: false }),
+      tanggal: now.toLocaleDateString('id-ID'),
+      foto: fotoDataUrl,
+      lokasi: lokasiKoord,
+      telat: tipe === 'masuk' ? (nowMin > win.target) : false
+    };
+
+    simpanAbsen(record);
+
+    // Modal
+    const isLate = record.telat;
+    document.getElementById('modal-icon').textContent = tipe === 'masuk' ? (isLate ? '⚠️' : '✅') : '🚪';
+    document.getElementById('modal-title').textContent = tipe === 'masuk'
+      ? (isLate ? 'Absen Masuk (Terlambat)' : 'Absen Masuk Berhasil!')
+      : 'Absen Keluar Berhasil!';
+    document.getElementById('modal-sub').textContent = `Halo, ${nama}!`;
+    document.getElementById('modal-time').textContent = record.waktu;
+    const mf = document.getElementById('modal-foto');
+    mf.src = fotoDataUrl;
+    mf.style.display = 'block';
+    document.getElementById('modal-sukses').classList.add('show');
+
+    renderHistory();
+    cekTombolAbsen();
+
+    // Reset foto untuk absen berikutnya
+    fotoDataUrl = null;
+    document.getElementById('snapshot-preview').style.display = 'none';
+    document.getElementById('btn-foto').textContent = '📸 Ambil Foto';
+  }
+
+  function tutupModal() {
+    document.getElementById('modal-sukses').classList.remove('show');
+  }
+
+  // ── PENYIMPANAN ──
+  function getKey() {
+    const d = new Date();
+    return `absenku_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
+  }
+
+  function simpanAbsen(record) {
+    const key = getKey();
+    const data = JSON.parse(localStorage.getItem(key) || '[]');
+    data.push(record);
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+
+  function getAbsenHariIni(tipe = null) {
+    const key = getKey();
+    const data = JSON.parse(localStorage.getItem(key) || '[]');
+    if (!tipe) return data;
+    return data.find(d => d.tipe === tipe) || null;
+  }
+
+  function renderHistory() {
+    const data = getAbsenHariIni();
+    const ul = document.getElementById('history-list');
+    if (!data.length) {
+      ul.innerHTML = '<li class="empty-history">Belum ada absensi hari ini</li>';
+      return;
+    }
+    ul.innerHTML = data.map(d => `
+      <li>
+        <div class="hist-icon ${d.tipe}">${d.tipe === 'masuk' ? '🟢' : '🔴'}</div>
+        <div class="hist-info">
+          <div class="hist-name">${d.nama}</div>
+          <div class="hist-time">${d.tanggal} · ${d.waktu}</div>
+        </div>
+        <span class="hist-badge ${d.tipe === 'keluar' ? 'keluar' : (d.telat ? 'telat' : 'tepat')}">
+          ${d.tipe === 'keluar' ? 'Keluar' : (d.telat ? 'Terlambat' : 'Tepat Waktu')}
+        </span>
+      </li>
+    `).join('');
+  }
+
+  // ── EXPORT CSV ──
+  function exportCSV() {
+    const data = getAbsenHariIni();
+    if (!data.length) { toast('Tidak ada data untuk diekspor'); return; }
+    const rows = [['Nama','Tipe','Tanggal','Waktu','Status','Lat','Lng']];
+    data.forEach(d => rows.push([
+      d.nama, d.tipe, d.tanggal, d.waktu,
+      d.tipe === 'keluar' ? 'Keluar' : (d.telat ? 'Terlambat' : 'Tepat Waktu'),
+      d.lokasi?.lat || '', d.lokasi?.lng || ''
+    ]));
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `absensi_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    toast('📥 CSV berhasil diunduh!');
+  }
+
+  // ── ADMIN ──
+  function toggleAdmin() {
+    const p = document.getElementById('admin-panel');
+    p.classList.toggle('show');
+    if (p.classList.contains('show')) {
+      document.getElementById('set-lat').value = CONFIG.lat;
+      document.getElementById('set-lng').value = CONFIG.lng;
+      document.getElementById('set-radius').value = CONFIG.radius;
+      document.getElementById('set-jam').value = CONFIG.jamMasuk;
+    }
+  }
+
+  function simpanSetting() {
+    const lat = parseFloat(document.getElementById('set-lat').value);
+    const lng = parseFloat(document.getElementById('set-lng').value);
+    const radius = parseInt(document.getElementById('set-radius').value);
+    const jam = document.getElementById('set-jam').value;
+    if (isNaN(lat) || isNaN(lng) || isNaN(radius)) { toast('⚠️ Isi semua kolom dengan benar'); return; }
+    CONFIG.lat = lat;
+    CONFIG.lng = lng;
+    CONFIG.radius = radius;
+    CONFIG.jamMasuk = jam;
+    localStorage.setItem('absenku_config', JSON.stringify(CONFIG));
+    document.getElementById('admin-panel').classList.remove('show');
+    toast('✅ Pengaturan disimpan!');
+    updateClock();
+  }
+
+  // ── TOAST ──
+  let toastTimer;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  // ── INIT ──
+  window.addEventListener('load', () => {
+    startCamera();
+    renderHistory();
+    updateClock();
+
+    // Jika sudah absen masuk hari ini, aktifkan tombol keluar
+    const sudahMasuk = getAbsenHariIni('masuk');
+    if (sudahMasuk) {
+      document.getElementById('btn-keluar').disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
